@@ -26,7 +26,7 @@ using namespace std;
 #define SERVERPORT 33518
 #define BUFFLEN 1000
 
-int clientTcpfd, serverTcpfd;
+int serverTcpfd;
 struct sockaddr_in serverAddr, clientAddr;
 
 void create_TCP_client(){
@@ -74,7 +74,6 @@ int main(int argc, const char *argv[]){
     cout << "name is:" << countryName << "id is " << ID << endl;
 
     //sendto mainserver
-    char usermsg[BUFFLEN];
     string str = countryName + "," + ID;
     strcpy(usermsg, str.c_str());
     int sendLen = send(serverTcpfd, usermsg, sizeof(usermsg), 0);

@@ -64,6 +64,20 @@ vector<string> split(string str, string pattern){
     return result;
 }
 
+vector<string> getData(){
+    vector<string> res;
+    string filename = "userData.txt";
+    ifstream file(filename);
+    if (file.is_open()){
+        string line;
+        while(getline(file, line)){
+            res = split(line, ",");
+        }
+    }
+    return res;
+    
+}
+
 //initiate UDP socket
 void create_UDP_socket(){
     //-----------1. create UDP-------------------------
@@ -108,7 +122,7 @@ void create_TCP_socket(){
     }
 
     mainSerTCP.sin_family = AF_INET;
-    mainSerTCP.sin_port = htons(TCPPORT);
+    mainSerTCP.sin_port = htons(33518);
     mainSerTCP.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     //2. bind tcp socket
@@ -125,6 +139,80 @@ void create_TCP_socket(){
 
 }
 
+
+
+
+void send_to_server(int current_port, string serverName, string request){
+    char usermsg[BUFFLEN];
+    string str;
+    if (request == "1"){
+        str = "COUNTRYLIST";
+    }
+    if (request == ""){
+        str = countryName + "," + userId;
+    }
+    
+    strcpy(usermsg, str.c_str());
+    int sendLen;
+    //decide which server to send the message
+    //send to server A
+
+    memset(&mainSerUDP, 0, sizeof(mainSerUDP));
+    mainSerUDP.sin_family = AF_INET;
+    mainSerUDP.sin_port = htons(current_port);
+    mainSerUDP.sin_addr.s_addr = inet_addr("127.0.0.1");
+    bind(mainSerUDPfd, (struct sockaddr *)&mainSerUDP, sizeof(mainSerUDP));
+    if (sendLen = sendto(mainSerUDPfd, usermsg, sizeof(usermsg), 0, (struct sockaddr *)&mainSerUDP, (socklen_t)sizeof(mainSerUDP)) == -1){
+        perror("Error in sending to server");
+        exit(1);
+    }
+    memset(usermsg, '0', sizeof(usermsg));
+    if (request == ""){
+        cout << "The Main Server has sent request from User" << userId << "to server" << serverName << "using UDP over port" << UDPPORT << endl;
+    }
+    request = "";
+    cout << "has sending..." << endl;
+}
+//receive infofrom servers
+void receive_from_server(string server_index){
+    char recvmsg[BUFFLEN];
+    //mainSerUDP.sin_port = htons(serverA_UDP_PORT);
+    int revcLen;
+    socklen_t fromlen = sizeof(UDPClientAddr);
+    revcLen = recvfrom(mainSerUDPfd, recvmsg, BUFFLEN, 0, (struct sockaddr *)&UDPClientAddr, &fromlen);
+    if (revcLen == -1){
+            perror("Error in receiving message");
+            exit(1);
+        }
+    cout <<"this is recvmsg::" << recvmsg << endl;
+    string restring = recvmsg;
+    if (restring == "1"){
+        flag = "0";
+    }
+    //socklen_t fromlen;
+    //这里需要清空recvmsg嘛
+
+    countrySetA.insert(recvmsg);  
+    memset(recvmsg, '0', sizeof(recvmsg));
+    cout << "The Main server has received the country list from server" << server_index << "using UDP over port" << UDPPORT <<endl;  
+}
+
+void receive_from_server2(string server_index){
+    char recvmsg2[BUFFLEN];
+    //mainSerUDP.sin_port = htons(serverA_UDP_PORT);
+    int revcLen2;
+    socklen_t fromlen2 = sizeof(UDPClientAddr);
+    revcLen2 = recvfrom(mainSerUDPfd, recvmsg2, BUFFLEN, 0, (struct sockaddr *)&UDPClientAddr, &fromlen2);
+    if (revcLen2 == -1){
+            perror("Error in receiving message");
+            exit(1);
+        }
+    cout <<"this is recvmsg::" << recvmsg2 << endl;
+    //socklen_t fromlen;
+    //这里需要清空recvmsg嘛  
+    memset(recvmsg2, '0', sizeof(recvmsg2));
+    cout << "The Main server has received the country list from server" << server_index << "using UDP over port" << UDPPORT <<endl;  
+}
 
 //set port and IP of two servers
 // void config_server(){
@@ -157,8 +245,37 @@ void do_service(int new_socket){
     //determine which port this info come from
     socklen_t tcpLen = sizeof(TCPclientAddr);
     getsockname(mainSerTCPfd, (struct sockaddr*)&TCPclientAddr, &tcpLen);
+    string filename = "userData";
+    filename.append(".txt");
+    ofstream file(filename);
+    if (file.is_open()){
+        file << countryName << ", " << userId <<endl;
+        file.close();
+    }
     //how to get the client index
-    cout << "The Main server has received the request on User" << userId << "in" << countryName << "from" << "client<client ID>" << "using TCP over port" << TCPclientAddr.sin_port << endl;
+    cout << "The Main server has received the request on User: " << userId << "in " << countryName << " from " << "client<client ID>" << " using TCP over port" << TCPclientAddr.sin_port << endl;
+
+    vector<string> data = getData();
+        countryName = data[0];
+        userId = data[1];
+        cout << "countryname is :" << countryName << "and id is ::" << userId << endl;
+        
+        //send & receive user message from server A & B
+        if (country_server.find(countryName) != country_server.end()){
+            if (country_server.at(countryName) == 0){
+                cout << countryName << "shows up in server A" << endl;
+                send_to_server(serverA_UDP_PORT, "A", "");
+                receive_from_server2("A");
+                
+            }
+            if (country_server.at(countryName) == 1){
+                cout << countryName << "shows up in server B" << endl;
+                send_to_server(serverB_UDP_PORT, "B", "");
+                receive_from_server("B");
+            }
+        }else{
+            cout << countryName << "does not show up in server A&B" << endl;
+        }
 }
 
 void accept_from_client(){
@@ -169,7 +286,6 @@ void accept_from_client(){
         perror("Error in accepting socket");
         exit(1);
     }
-
     pid = fork();
     if (pid == -1){
         perror("Error in fork");
@@ -188,7 +304,7 @@ void accept_from_client(){
 void send_to_client(string recommendation){
     char usermsg[BUFFLEN];
     strcpy(usermsg, recommendation.c_str());
-    int sendLen = send(serverTcpfd, usermsg, sizeof(usermsg), 0);
+    int sendLen = send(mainSerTCPfd, usermsg, sizeof(usermsg), 0);
     if (sendLen == -1){
         perror("Error in sending message to main server");
         exit(1);
@@ -199,67 +315,7 @@ void send_to_client(string recommendation){
 
 
 
-//receive infofrom servers
-string receive_from_server(string server_index){
-    char recvmsg[BUFFLEN];
-    //mainSerUDP.sin_port = htons(serverA_UDP_PORT);
-    int revcLen;
-    socklen_t fromlen = sizeof(UDPClientAddr);
-    revcLen = recvfrom(mainSerUDPfd, recvmsg, BUFFLEN, 0, (struct sockaddr *)&UDPClientAddr, &fromlen);
-    if (revcLen == -1){
-            perror("Error in receiving message");
-            exit(1);
-        }
-    cout << "is receving?" << endl;
-    cout <<"this is recvmsg::" << recvmsg << endl;
-    string restring = recvmsg;
-    if (restring == "1"){
-        flag = "0";
-        return "";
-    }
-    //socklen_t fromlen;
-    //这里需要清空recvmsg嘛
-    //memset(recvmsg, '0', sizeof(recvmsg));
-    countrySetA.insert(recvmsg);
-   
 
-    string res = recvmsg;
-    cout << "The Main server has received the country list from server" << server_index << "using UDP over port" << UDPPORT <<endl;
-    return res;   
-}
-
-
-void send_to_server(int current_port, string serverName, string request){
-    char usermsg[BUFFLEN];
-    string str;
-    if (request == "1"){
-        str = "COUNTRYLIST";
-    }
-    if (request == ""){
-        str = "USERMSG" + countryName + ", " + userId;
-    }
-    
-    strcpy(usermsg, str.c_str());
-    int sendLen;
-    //decide which server to send the message
-    //send to server A
-
-    memset(&mainSerUDP, 0, sizeof(mainSerUDP));
-    mainSerUDP.sin_family = AF_INET;
-    mainSerUDP.sin_port = htons(current_port);
-    mainSerUDP.sin_addr.s_addr = inet_addr("127.0.0.1");
-    bind(mainSerUDPfd, (struct sockaddr *)&mainSerUDP, sizeof(mainSerUDP));
-    if (sendLen = sendto(mainSerUDPfd, usermsg, sizeof(usermsg), 0, (struct sockaddr *)&mainSerUDP, (socklen_t)sizeof(mainSerUDP)) == -1){
-        perror("Error in sending to server");
-        exit(1);
-    }
-
-    if (request == ""){
-        cout << "The Main Server has sent request from User" << userId << "to server" << serverName << "using UDP over port" << UDPPORT << endl;
-    }
-    request = "";
-    cout << "has sending..." << endl;
-}
 
 void set_country_server(unordered_set<string> countrySetA, unordered_set<string> countrySetB){
     //for all country stored in A server, set value 0;
@@ -279,6 +335,8 @@ void set_country_server(unordered_set<string> countrySetA, unordered_set<string>
     }    
 }
 
+
+
 // vector<string> split(string str){
 //     stringstream ss(str);
 //     istream_iterator<string> begin(ss);
@@ -292,8 +350,9 @@ int main(int argc, const char * argv[]) {
     //construct graph
     //int port = 12345;
     
+    
     create_UDP_socket();
-    //create_TCP_socket();
+    create_TCP_socket();
 
     cout << "The Main server is up and running."<< endl; 
     
@@ -301,43 +360,30 @@ int main(int argc, const char * argv[]) {
     while(flag == "1"){
         //request and receive contryList from A & B
         send_to_server(serverA_UDP_PORT, "A", "1");
-        resA = receive_from_server("A");
+        receive_from_server("A");
         // send_to_server(serverB_UDP_PORT, "B", "1");
         // resB = receive_from_server("B");
         
     }
     set_country_server(countrySetA, countrySetB);
         cout << request << endl;
-    flag = "1";
     
+    unordered_map<string, int>::iterator it;
+    (*it).first;
+    (*it).second;
+    for (unordered_map<string, int>::iterator i = country_server.begin(); i != country_server.end(); i++){
+           int server = i -> second;
+           string curCountry = i -> first;
+        //country_server[*i] = 0;
+        cout << "country is :" << curCountry << "  and server is ::"<< server <<endl;
+    }
 
-/*
     while(1){
         //accept a call from client & receive user query from client
-        accept_from_client()
-        
-        //send & receive user message from server A & B
-        if (map.find(countryName) != map.end()){
-            if (map.at(countryName) == 0){
-                cout << countryName << "shows up in server A" << endl;
-                send_to_server(serverA_UDP_PORT, "A", "");
-                resA = receive_from_server("A");
-            }
-            if (map.at(countryName) == 1){
-                cout << countryName << "shows up in server B" << endl;
-                send_to_server(serverB_UDP_PORT, "B", "");
-                resB = receive_from_server("B");
-            }
-        }else{
-            cout << countryName << "does not show up in server A&B" << endl;
-        }
-        
-*/    
-        
-
-        //receive user message from serverA & B
+        accept_from_client();
+        cout << "receive user message from serverA & B"<<endl;
                     
-    //}
+    }
 
     // char recvmsg[BUFFLEN];
     // socklen_t len = sizeof(mainSerUDP);

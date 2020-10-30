@@ -41,6 +41,7 @@ char recvbuf[BUFFLEN];
 string country;
 string user;
 string request;
+int exe_flag = 1;
 
 struct graph{
     unordered_map<string, unordered_set<string>> user_graph;
@@ -51,6 +52,26 @@ struct graph{
 
 unordered_map<string, graph> contry_graph;
 vector<string> country_list;
+
+vector<string> split(string str, string pattern){
+    //string::size_type pos;
+    vector<string> result;
+
+    while (str.size()){
+        int index = str.find(pattern);
+        if (index != string::npos){
+            result.push_back(str.substr(0, index));
+            str = str.substr(index + pattern.size());
+            if (str.size() == 0){
+                result.push_back(str);
+            }
+        }else{
+            result.push_back(str);
+            str = "";
+        }
+    }
+    return result;
+}
 
 //create UDP connection with main server
 void create_UDP_socket(){
@@ -77,6 +98,8 @@ void create_UDP_socket(){
 
 }
 
+
+
 string findMostDegree(unordered_map<string, unordered_set<string>> userGraph, unordered_set<string> neighbors){
     int max = 0;
     string userIndex = "";
@@ -96,13 +119,13 @@ string findMostDegree(unordered_map<string, unordered_set<string>> userGraph, un
     return userIndex;      
 }
 
-string findMostCommon(unordered_map<string, unordered_set<string>> userGraph, unordered_set<string> neighbors, unordered_set<string> totalUser){
+string findMostCommon(unordered_map<string, unordered_set<string>> userGraph, unordered_set<string> neighbors, unordered_set<string> totalUser, string userId){
     //find all nodes not connecting to the ndoe
     string userIndex = "";
     vector<string> notConnect;
      for(unordered_set<string>::iterator it=totalUser.begin() ;it!=totalUser.end();it++){
          string cur = *it;
-             if (neighbors.find(cur) != neighbors.end() || cur == "108"){
+             if (neighbors.find(cur) != neighbors.end() || cur == userId){
             continue; 
         }else{
             //cout << "cur is " << cur << endl;
@@ -147,6 +170,11 @@ string recommend_to_user(string country, string userId){
     //cout << "total user are" << totalUser.size() << endl;
     unordered_set<string> neighbors = countryGraph.user_graph[userId];
     //cout << "neighbot size is" << neighbors.size() << endl;
+    
+    if (totalUser.find(userId) == totalUser.end()){
+        cout << "1232312321313132112311" << endl;
+        return "Does not in the server A!";
+    }
     //case 1:only have one node in this country or all users connect with him/her
     if (totalUser.size() == 1){
         return res;
@@ -160,9 +188,59 @@ string recommend_to_user(string country, string userId){
         return findMostDegree(userGraph, totalUser);
     }
         //case 3: many nodes in this country, and node has neighbors
-    return findMostCommon(userGraph, neighbors, totalUser);
+    return findMostCommon(userGraph, neighbors, totalUser, userId);
     
 
+}
+
+void sendToMainServer(){
+    int sendLen;
+    //i the request is "1", then send country list to the main server
+    //use sprintf to transfer vector<sring> to string
+    if (request == "1"){
+        char countrymsg[BUFFLEN];
+        
+        for (vector<string>::iterator item = country_list.begin(); item != country_list.end(); item++){
+            string country = *item;
+            strcpy(countrymsg, country.c_str());
+            cout << "send message is countrymsg" << countrymsg << endl;
+            //sprintf(contrymsg,"%s", country_list[i]);
+            //cout << "this is "<<countrymsg << endl;
+            
+
+            if (sendLen = sendto(serverAfd, countrymsg, sizeof(countrymsg), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr)) == -1){
+                perror("Error in sending message to main server");
+                exit(1);
+            }
+            memset(countrymsg, '\0', sizeof(countrymsg));
+        }
+        //request = "";
+        cout << "has sent.." << endl;
+        char msg[BUFFLEN];
+        strcpy(msg, flag.c_str());
+        sendto(serverAfd, msg , sizeof(msg), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr));
+    }
+    
+    //if request is 0, then the server A should send user recommendation to the mainserver
+    if (request == ""){
+
+        cout << "The server A is searching possible friends for User << user << …" <<endl;
+
+        string recommend = recommend_to_user(country, user);
+        cout << "recommend info is :" << recommend << endl;
+        char recommendInfo [BUFFLEN];
+
+        strcpy(recommendInfo, recommend.c_str());
+        if (sendLen = sendto(serverAfd, recommendInfo, sizeof(recommendInfo), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr)) == -1){
+                perror("Error in sending message to main server");
+                exit(1);
+            }
+            memset(recommendInfo, '\0', sizeof(recommendInfo));
+        cout <<"The server A has sent the result(s) to Main Server" << "and the result is:" << recommend << endl ;
+
+
+    }
+    request = "";
 }
 
 
@@ -180,59 +258,27 @@ void receiveFromMainServer(){
         
     //handle the receive messgae
     string recvmsg = recvbuf;
+    cout << "recvmsg" << recvmsg << endl;
     if (recvmsg == "COUNTRYLIST"){
         //set a falg to request, if it is 1, serverA send countryLIst to the mainserver
         request = "1";
     }
-    if (recvmsg == "USERMSG"){
-        country = recvbuf[0];
-        user = recvbuf[1];
+    if (recvmsg != "COUNTRYLIST"){
+        cout << "not countrylist" << endl;
+        vector<string> userdata = split(recvmsg,",");
+        country = userdata[0];
+        cout << "country is " << country << endl;
+        user = userdata[1];
+        user.erase(0, user.find_first_not_of(" "));
+        cout << "user is " << user << endl;
         cout << "The server A has received request for finding possible friends of User"<< user << "in" << country  <<endl;
+        //sendToMainServer();
+        cout << "send???????" << endl;
     }    
 }
 
-void sendToMainServer(){
-    //i the request is "1", then send country list to the main server
-    //use sprintf to transfer vector<sring> to string
-    if (request == "1"){
-        char countrymsg[BUFFLEN];
-        
-        for (vector<string>::iterator item = country_list.begin(); item != country_list.end(); item++){
-            string country = *item;
-            strcpy(countrymsg, country.c_str());
-            cout << "send message is countrymsg" << countrymsg << endl;
-            //sprintf(contrymsg,"%s", country_list[i]);
-            //cout << "this is "<<countrymsg << endl;
-            int sendLen;
 
-            if (sendLen = sendto(serverAfd, countrymsg, sizeof(countrymsg), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr)) == -1){
-                perror("Error in sending message to main server");
-                exit(1);
-            }
-            memset(countrymsg, '\0', sizeof(countrymsg));
-        }
-        request = "";
-        cout << "has sent.." << endl;
-    }
     
-    //if request is 0, then the server A should send user recommendation to the mainserver
-    if (request == "0"){
-        cout << "The server A is searching possible friends for User << user << …" <<endl;
-        string recommend = recommend_to_user(country, user);
-        char recommendInfo [BUFFLEN];
-        strcpy(recommendInfo, recommend.c_str());
-        if (sendLen = sendto(serverAfd, recommendInfo, sizeof(recommendInfo), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr)) == -1){
-                perror("Error in sending message to main server");
-                exit(1);
-            }
-            memset(recommendInfo, '\0', sizeof(recommendInfo));
-        cout <<"The server A has sent the result(s) to Main Server" << endl;
-
-
-    }
-    char msg[BUFFLEN];
-    strcpy(msg, flag.c_str());
-    sendto(serverAfd, msg , sizeof(msg), 0, (struct sockaddr *) &mainServerAddr, (socklen_t)sizeof(mainServerAddr));
     
     //if the flag is empty, then, send the user info
     // if (request == ""){
@@ -241,7 +287,7 @@ void sendToMainServer(){
     
 
     
-}
+
 
 // the first one is the city and following ones are cities connect to it
 //store city list and adjacency list for each city
@@ -257,6 +303,8 @@ void sendToMainServer(){
 
 void contructGraph(){
     //int graphIndex = 0;
+    string curcoun;
+    graph curGraph;
     ifstream infile("/home/student/Documents/ee450_socket/testcases/testcase2/data1.txt");
     if (infile.is_open()){
         string line = "";
@@ -264,10 +312,14 @@ void contructGraph(){
             if (!isdigit(line.at(0))){
                 //cout<<line<<endl;
                 country_list.push_back(line);
-                contry_graph[line] = graph();
+                curcoun = line;
+                //cout << "current country ::" <<curcoun << endl;
+                //curGraph = contry_graph[curcoun];
+                //counter = counter + 1;
+                //cout << "counter is ："<<counter<< endl;
                 continue;
-            }
-            //cout<<line<<endl;
+            }else{
+                  //cout<<line<<endl;
             //cout<<"this is a linr"<<endl;
             unordered_set<string> neighbors;
             vector<string> lists;
@@ -276,18 +328,21 @@ void contructGraph(){
 
                 for ( std::istringstream is( line ); is >> word; )
                 {
-                    //std::cout << word << '\n';
+                    //std::cout <<"word" << word << '\n';
                     lists.push_back(word);
+
                 }
-                       
             string user = lists.at(0);
             //cout<<"user"<<user<<endl;
-            contry_graph[line].user.insert(user);
+            //cout << "line is ::::" << line << endl;
+            contry_graph[curcoun].user.insert(user);
+            //cout << "curGraph.user size :::" << contry_graph[curcoun].user.size() << endl;
             for (int i = 1; i < lists.size(); i++){
                 //cout<<lists.at(i)<<endl;
                 neighbors.insert(lists.at(i));
             }
-            contry_graph[line].user_graph[user] = neighbors;
+            contry_graph[curcoun].user_graph[user] = neighbors;
+            }
         }
     }
 }
@@ -306,14 +361,29 @@ int main(int argc, const char * argv[]) {
 
     cout << "The server A is up and running using UDP on port" << serverA_UDP_PORT << endl; 
     contructGraph();
+    
+    // if (exe_flag == 1){
+        // receiveFromMainServer();
+        // sendToMainServer();
+    //}
+    
+    // if (exe_flag == 0){
+        while(1){
+            receiveFromMainServer();
+            sendToMainServer();
+        }
+    //}
+
+    exe_flag = 0;
+    
 
     //strcpy(countrymsg, "hello world \n");
     
     //for (int i = 0; i < country_list.size(); i++){
-        receiveFromMainServer();
+        
         
         //cout << "222222" << endl;
-        sendToMainServer();
+        
         //cout << "555555" << endl;
     //}
     //std::cout << "Hello, World!\n";
