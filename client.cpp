@@ -40,10 +40,30 @@ void create_TCP_client(){
     serverAddr.sin_port = htons(33518);
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    cout << "The client is up and running" << endl;
+    //cout << "The client is up and running" << endl;
 
 
     
+}
+
+vector<string> split(string str, string pattern){
+    //string::size_type pos;
+    vector<string> result;
+
+    while (str.size()){
+        int index = str.find(pattern);
+        if (index != string::npos){
+            result.push_back(str.substr(0, index));
+            str = str.substr(index + pattern.size());
+            if (str.size() == 0){
+                result.push_back(str);
+            }
+        }else{
+            result.push_back(str);
+            str = "";
+        }
+    }
+    return result;
 }
 
 
@@ -55,6 +75,7 @@ int main(int argc, const char *argv[]){
     Enter user ID: 78
     */
     create_TCP_client();
+    cout << "The client is up and running" << endl;
 
     if ((connect(serverTcpfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr))) ==-1){
         perror("Error in create tcp socket!");
@@ -62,7 +83,7 @@ int main(int argc, const char *argv[]){
     }
 
     //sendto mainserver
-    char usermsg[BUFFLEN];
+    char usermsg[BUFFLEN] ;
     string name;  
     string countryName;
     string ID;
@@ -71,7 +92,7 @@ int main(int argc, const char *argv[]){
     cout << "Enter user ID:";
     cin >> ID;
     //std::cout << "Hello, World!\n";
-    cout << "name is:" << countryName << "id is " << ID << endl;
+    //cout << "name is:" << countryName << "id is " << ID << endl;
 
     //sendto mainserver
     string str = countryName + "," + ID;
@@ -82,7 +103,7 @@ int main(int argc, const char *argv[]){
         exit(1);
     }
     //how to identify client 1 and client 2
-    cout << "Client has sent User "<< ID <<"and " <<  countryName << "to Main Server using TCP" << endl;
+    cout << "Client has sent User <"<< ID <<"> and <" <<  countryName << "> to Main Server using TCP" << endl;
 
 
     //receive from mainserver
@@ -93,8 +114,35 @@ int main(int argc, const char *argv[]){
         close(serverTcpfd);
         exit(1);
     }
-    //not finish don't know the format of receive message.
-
+    //cout << "this is recvms ::" << recvmsg << endl; 
+    //There are four cases of recvmsg
+    //1. country not found
+    string str2 = recvmsg;
+    if (str2 == "None this country"){
+        cout << countryName << " has not found" << endl;
+    }
+    //2. user has not found
+    else if (str2 == "USER NOT FOUND"){
+        cout << "user <" << ID << "> has not found" << endl;
+    }
+    else{
+    string resString = recvmsg;
+    vector<string> indexAndRecommend = split(resString, ",");
+    string recommend = indexAndRecommend[0];
+    string index = indexAndRecommend[1];
+    //cout << "recommendation is " << recommend << "index is :" << index<<endl;
+    //3. no recommendation
+    if (recommend == "No connection"){
+        cout << "Client" << index << " has received results from Main Server: there is no recommendation!" << endl;
+    }
+    //4. connect to everyone
+    if (recommend == "has connect every one"){
+        cout << "Client" << index << " has received results from Main Server: this user has connect to everyone in this country!" << endl;
+    }else{
+        cout << "Client" << index << " has received results from Main Server: User <" << recommend << "> is possible friend of User<" << ID << "> in <" << countryName << ">" << endl;
+    }
+    }
+    
 
 
   
