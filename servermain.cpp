@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-//#include <errno.h>
 #include <string.h>
-//#include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -12,15 +10,11 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-//#include <map>
 #include <unordered_map>
 #include <string>
 #include <set>
-//#include <algorithm>
 #include <sstream>
-//#include <typeinfo>
 #include <unordered_set>
-//#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -47,8 +41,8 @@ string flag2 = "1";
 string recommendRes;
 int client_index = 0;
 
+//split received string to vector<string>
 vector<string> split(string str, string pattern){
-    //string::size_type pos;
     vector<string> result;
 
     while (str.size()){
@@ -67,6 +61,7 @@ vector<string> split(string str, string pattern){
     return result;
 }
 
+//get data from "userdata/txt"
 vector<string> getData(){
     vector<string> res;
     string filename = "userData.txt";
@@ -84,15 +79,13 @@ vector<string> getData(){
 //initiate UDP socket
 void create_UDP_socket(){
     //-----------1. create UDP-------------------------
-    //int serverAfd = 0;
-    
+    //reference of this part is Beej guidance
     if ((mainSerUDPfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1){
         perror("Cannot create UDP connection");
         exit(1);
     }
     
     
-    //mainSerUDPfd = socket(AF_INET, SOCK_DGRAM, 0);
     memset(&mainSerUDP, 0, sizeof(mainSerUDP));
     mainSerUDP.sin_family = AF_INET;
     mainSerUDP.sin_port = htons(UDPPORT);
@@ -100,7 +93,6 @@ void create_UDP_socket(){
 
 
     // //-----------2. bind UDP----------------------------
-    // bind(mainSerUDPfd, (struct sockaddr *)&mainSerUDP, sizeof(mainSerUDP));
     if (bind(mainSerUDPfd, (struct sockaddr *)&mainSerUDP, sizeof(mainSerUDP)) < 0){
         close(mainSerUDPfd);
         perror("cannot bind the UDP socket");
@@ -109,6 +101,7 @@ void create_UDP_socket(){
 
 }
 
+//reference in this part is Beej guidance
 void create_TCP_socket(){
     //1.create tcp socket
     mainSerTCPfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -143,7 +136,7 @@ void create_TCP_socket(){
 
 
 
-
+//reference of snedto is Beej guidance
 void send_to_server(int current_port, string serverName, string request){
     char usermsg[BUFFLEN];
     string str;
@@ -156,9 +149,8 @@ void send_to_server(int current_port, string serverName, string request){
     
     strcpy(usermsg, str.c_str());
     int sendLen;
-    //decide which server to send the message
-    //send to server A
 
+    //decide which server to send the message
     memset(&mainSerUDP, 0, sizeof(mainSerUDP));
     mainSerUDP.sin_family = AF_INET;
     mainSerUDP.sin_port = htons(current_port);
@@ -174,6 +166,8 @@ void send_to_server(int current_port, string serverName, string request){
     }
     request = "";
 }
+
+//reference of snedto is Beej guidance
 void send_to_server2(int current_port, string serverName, string request){
     char usermsg[BUFFLEN];
     string str;
@@ -187,7 +181,6 @@ void send_to_server2(int current_port, string serverName, string request){
     strcpy(usermsg, str.c_str());
     int sendLen;
     //decide which server to send the message
-    //send to server A
 
     if ((mainSerUDPfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1){
         perror("Cannot create UDP connection");
@@ -211,7 +204,9 @@ void send_to_server2(int current_port, string serverName, string request){
     }
     request = "";
 }
+
 //receive infofrom servers
+//reference of recvfrom is Beej guidance
 void receive_from_server(string server_index){
     char recvmsg[BUFFLEN];
     int revcLen;
@@ -221,11 +216,9 @@ void receive_from_server(string server_index){
             perror("Error in receiving message");
             exit(1);
         }
-    //cout <<"this is recvmsg::" << recvmsg << endl;
     
     //if the receive message is country
     if (flag1 == "1"){
-    ///if (!isdigit(recvmsg[0])){
         if (server_index == "A"){
             string restring = recvmsg;
             //if reach the end of the country list, jump out of the receive loop
@@ -250,33 +243,16 @@ void receive_from_server(string server_index){
             memset(recvmsg, '0', sizeof(recvmsg)); 
         }
     }
-    // if (flag2 =="1" && flag1 =="0"){
-    //     if (server_index == "B"){
-    //         string restring = recvmsg;
-    //         //if reach the end of the country list, jump out of the receive loop
-    //         if (restring == "NOTHING"){
-    //             flag2 = "0";
-    //             return;
-    //         }
-
-    //         countrySetB.insert(recvmsg);  
-    //         memset(recvmsg, '0', sizeof(recvmsg)); 
-    //         cout << "The Main server has received the country list from server " << server_index << "using UDP over port" << UDPPORT <<endl; 
-    //     }
-
-    // }
         
     
     //if the receive message is the recommend user
     if (flag1 == "0"){
-    //if (isdigit(recvmsg[0])){
         //there are four case of received message and process them in the client side
         //1. has no recommendation
         //2. connect to every other nodes
         //3. recommendation + client_index
         //4. user not exist
         recommendRes = recvmsg;
-        //cout << "recommendRes is ???? " << recommendRes << endl;
         //if the user is not exist
         if (recommendRes == "USER NOT FOUND"){
             cout << "The Main server has received User ID:NOT fount from server <" << server_index <<">" << endl;
@@ -286,9 +262,10 @@ void receive_from_server(string server_index){
      
 }
 
+//reference of sned is Beej guidance
 void send_to_client(string recommendation,int new_socket){
     char usermsg[BUFFLEN];
-    //cout << "recommendatio is::" << recommendation << "client_index is ::" << client_index << endl;
+    //if the user is not found or is not in this country
     if (recommendation == "USER NOT FOUND" || recommendation == "None this country"){
         strcpy(usermsg, recommendation.c_str());
         //cout << "usermsge ::" << usermsg << endl;
@@ -299,6 +276,7 @@ void send_to_client(string recommendation,int new_socket){
             }
 
     }else{
+        //has the valid recommendation
         string str = recommendation +","+ to_string(client_index);
         strcpy(usermsg, str.c_str());
         int sendLen = send(new_socket, usermsg, sizeof(usermsg), 0);
@@ -315,12 +293,12 @@ void send_to_client(string recommendation,int new_socket){
     }
     socklen_t tcpLen = sizeof(TCPclientAddr);
     getsockname(new_socket, (struct sockaddr*)&TCPclientAddr, &tcpLen);
-    //how to identify client 1 and client 2
     cout << "The Main Server has sent searching result to client using TCP over port:" << TCPclientAddr.sin_port <<endl;
 }
 
 
 //receive from client
+//reference of ercv is Beej guidance
 void do_service(int new_socket){
     char recvbuf[BUFFLEN];
     int recvLen;
@@ -345,13 +323,11 @@ void do_service(int new_socket){
         file << countryName << ", " << userId <<endl;
         file.close();
     }
-    //how to get the client index
     cout << "The Main server has received the request on User: " << userId << "in " << countryName << " from " << "client <" << client_index  << "> using TCP over port:" << TCPclientAddr.sin_port << endl;
 
     vector<string> data = getData();
         countryName = data[0];
         userId = data[1];
-        //cout << "countryname is :" << countryName << "and id is ::" << userId << endl;
         
         //send & receive user message from server A & B
         if (country_server.find(countryName) != country_server.end()){
@@ -427,20 +403,7 @@ void set_country_server(unordered_set<string> countrySetA, unordered_set<string>
 }
 
 
-
-// vector<string> split(string str){
-//     stringstream ss(str);
-//     istream_iterator<string> begin(ss);
-//     istream_iterator<string> end;
-//     vector<string> res(begin, end);
-//     copy(res.begin(), res.end(), ostream_iterator<string>);
-//     return res;
-// }
-
 int main(int argc, const char * argv[]) {
-    //construct graph
-    //int port = 12345;
-    
     
     create_UDP_socket();
     create_TCP_socket();
@@ -470,41 +433,11 @@ int main(int argc, const char * argv[]) {
     close(mainSerUDPfd);
     
     set_country_server(countrySetA, countrySetB);
-        //cout << request << endl;
-    
-    unordered_map<string, int>::iterator it;
-    (*it).first;
-    (*it).second;
-    for (unordered_map<string, int>::iterator i = country_server.begin(); i != country_server.end(); i++){
-           int server = i -> second;
-           string curCountry = i -> first;
-        //country_server[*i] = 0;
-        //cout << "country is :" << curCountry << "  and server is ::"<< server <<endl;
-    }
+
 
     while(1){
-        //accept a call from client & receive user query from client
-        accept_from_client();
-        
-        //send_to_client(recommendRes);
-
-                    
+        accept_from_client();               
     }
-
-    // char recvmsg[BUFFLEN];
-    // socklen_t len = sizeof(mainSerUDP);
-    // printf("start receiving\n");
-    // recvfrom(mainSerUDPfd, recvmsg, BUFFLEN, 0, (struct sockaddr *)&serverAaddr, &len);
-    //printf(*recvmsg);
-
-    // for (int i = 0; i < resA.size(); i++){
-    //     cout << resA[i] << endl;
-    // }
-    //printf("%s",recvmsg);
-    
-
-    // set_country_server(countrySetA, countrySetB);
-
-    //std::cout << "Hello, World!\n";
+    close(mainSerUDPfd);
     return 0;
 }
