@@ -301,7 +301,7 @@ void contructGraph(){
     //int graphIndex = 0;
     string curcoun;
     graph curGraph;
-    ifstream infile("/home/student/Documents/ee450_socket/testcases/testcase2/data1.txt");
+    ifstream infile("/home/student/Documents/ee450_socket/testcases/testcase3/data1.txt");
     if (infile.is_open()){
         string line = "";
         while (getline( infile, line )){
